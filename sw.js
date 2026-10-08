@@ -1,4 +1,4 @@
-const CACHE = "greenflow-shell-v22";
+const CACHE = "greenflow-shell-v23";
 const ASSETS = [
   "./",
   "./index.html",

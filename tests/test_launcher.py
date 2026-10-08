@@ -78,7 +78,7 @@ class ServerTests(unittest.TestCase):
             self.assertIn(b"Opening GreenFlow", response.read())
 
     def test_old_file_timestamps_do_not_return_stale_conditional_responses(self):
-        request = Request(self.origin + "/app.js?v=22", headers={"If-Modified-Since": "Fri, 01 Jan 2100 00:00:00 GMT"})
+        request = Request(self.origin + "/app.js?v=23", headers={"If-Modified-Since": "Fri, 01 Jan 2100 00:00:00 GMT"})
         with urlopen(request, timeout=5) as response:
             self.assertEqual(response.status, 200)
             self.assertEqual(response.headers["Cache-Control"], "no-store")

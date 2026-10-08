@@ -38,34 +38,61 @@
     );
   const iso = (d) => {
     d = new Date(d);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
   };
-  const today = () => iso(new Date());
-  const fromISO = (s) => new Date(s + "T12:00:00");
+  const tehranClock = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tehran",
+    calendar: "gregory",
+    numberingSystem: "latn",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const clockParts = (date = new Date()) =>
+    Object.fromEntries(
+      tehranClock.formatToParts(date).map(({ type, value }) => [type, value]),
+    );
+  const today = () => {
+    const p = clockParts();
+    return `${p.year}-${p.month}-${p.day}`;
+  };
+  // Calendar dates are UTC noon; browser time zones must never shift a selected day.
+  const fromISO = (s) => new Date(s + "T12:00:00Z");
   const addDays = (s, n) => {
     let d = fromISO(s);
-    d.setDate(d.getDate() + n);
+    d.setUTCDate(d.getUTCDate() + n);
     return iso(d);
   };
   const dateFormats = {
     parts: new Intl.DateTimeFormat("en-US-u-ca-persian", {
+      timeZone: "UTC",
       year: "numeric",
       month: "numeric",
       day: "numeric",
     }),
     short: new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "UTC",
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
     }),
     long: new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "UTC",
       weekday: "long",
       day: "numeric",
       month: "long",
       year: "numeric",
     }),
-    month: new Intl.DateTimeFormat("fa-IR-u-ca-persian", { month: "long" }),
+    month: new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "UTC",
+      month: "long",
+    }),
     monthYear: new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      timeZone: "UTC",
       month: "long",
       year: "numeric",
     }),
@@ -77,11 +104,11 @@
   const longJ = (s) => dateFormats.long.format(fromISO(s));
   const weekStart = (s) => {
     let d = fromISO(s),
-      diff = (d.getDay() + 1) % 7;
-    d.setDate(d.getDate() - diff);
+      diff = (d.getUTCDay() + 1) % 7;
+    d.setUTCDate(d.getUTCDate() - diff);
     return iso(d);
   };
-  const weekdayFa = (s) => jsFa[fromISO(s).getDay()];
+  const weekdayFa = (s) => jsFa[fromISO(s).getUTCDay()];
   const fmtMin = (n) => {
     n = Math.max(0, Number(n) || 0);
     let h = Math.floor(n / 60),
@@ -905,7 +932,7 @@
       else if (m === "month") {
         logCursor = movePersianMonth(logCursor, n);
       } else {
-        d.setFullYear(d.getFullYear() + n);
+        d.setUTCFullYear(d.getUTCFullYear() + n);
         logCursor = iso(d);
       }
       renderLogs();
@@ -1451,12 +1478,9 @@
   }
 
   function checkReminders() {
-    let now = new Date(),
-      d = today(),
-      hh =
-        String(now.getHours()).padStart(2, "0") +
-        ":" +
-        String(now.getMinutes()).padStart(2, "0"),
+    const p = clockParts();
+    let d = `${p.year}-${p.month}-${p.day}`,
+      hh = `${p.hour}:${p.minute}`,
       changed = false;
     state.reminders
       .filter((r) => r.date === d && !r.notified)
@@ -2302,13 +2326,13 @@
   function calendarYear(y) {
     if (calendarYears.has(y)) return calendarYears.get(y);
     const map = new Map();
-    let d = new Date(y + 621, 2, 15, 12);
+    let d = new Date(Date.UTC(y + 621, 2, 15, 12));
     for (let i = 0; i < 375; i++) {
       const is = iso(d),
         p = pParts(is);
       if (p.year === y) map.set(`${p.month}/${p.day}`, is);
       else if (p.year > y && map.size) break;
-      d.setDate(d.getDate() + 1);
+      d.setUTCDate(d.getUTCDate() + 1);
     }
     if (calendarYears.size >= 6) calendarYears.clear();
     calendarYears.set(y, map);
@@ -2317,11 +2341,16 @@
   let midnightTimer;
   function scheduleMidnight() {
     clearTimeout(midnightTimer);
-    const next = new Date();
-    next.setHours(24, 0, 0, 0);
+    const now = new Date();
+    const p = clockParts(now);
+    const elapsed =
+      (Number(p.hour) * 3600 + Number(p.minute) * 60 + Number(p.second)) *
+        1000 +
+      now.getUTCMilliseconds();
+    const untilMidnight = 86400000 - elapsed;
     midnightTimer = setTimeout(
       () => handleDayRollover(),
-      Math.max(1, next.getTime() - Date.now() + 25),
+      Math.max(1, untilMidnight + 25),
     );
   }
 
@@ -2655,7 +2684,7 @@ if (
 ) {
   window.addEventListener("load", () =>
     navigator.serviceWorker
-      .register("./sw.js?v=22", { updateViaCache: "none" })
+      .register("./sw.js?v=23", { updateViaCache: "none" })
       .then((registration) => registration.update())
       .catch(() => {}),
   );

@@ -1,4 +1,4 @@
-GREENFLOW LOCAL — v22
+GREENFLOW LOCAL — v23
 
 Run
 - Windows: double-click start-greenflow.bat in the current extracted folder and
@@ -13,7 +13,7 @@ If the launcher opens an old app
 - Close every old GreenFlow server window and GreenFlow browser tab.
 - Download the latest ZIP (or git pull) and extract all files into the folder you
   intend to use. Run that folder's start-greenflow.bat; the console prints the
-  exact folder being served. The sidebar should show v22.
+  exact folder being served. The sidebar should show v23.
 - If port 8765 is occupied, the launcher stops with instructions instead of
   opening an older server. It does not terminate another program automatically.
 - The launch page refreshes only GreenFlow's offline app files. It keeps saved
@@ -45,7 +45,7 @@ Performance and offline loading
 - Calendar formatters/conversions and history totals are cached. Only the visible
   view renders after changes; hidden views refresh when opened. Timer ticks update
   the clock without rebuilding the issue selector.
-- The v22 service worker fetches current app files when the server is reachable
+- The v23 service worker fetches current app files when the server is reachable
   and uses cached files offline. The launcher repairs stale offline caches before
   opening the planner, without touching localStorage.
 - Localhost supports service workers. A phone using a plain HTTP LAN address may
@@ -62,3 +62,5 @@ Development checks
 - The tests include launcher/server checks and browser regressions. They serve
   their own temporary local server and use isolated browser contexts.
   They do not use or clear your real browser's planner data.
+
+Today, reminders, and daily rollover use Tehran time regardless of the browser time zone. Calendar dates keep their selected day in all time zones.

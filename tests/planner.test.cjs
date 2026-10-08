@@ -129,7 +129,7 @@ after(async () => {
 
 async function withPage(run, data = fixture(), time = instant, options = {}) {
   const context = await browser.newContext({
-    timezoneId: "Asia/Tehran",
+    timezoneId: options.timezoneId || "Asia/Tehran",
     serviceWorkers: options.serviceWorkers || "block",
     viewport: options.viewport || { width: 1440, height: 1000 },
   });
@@ -526,7 +526,7 @@ test("offline shell keeps saved plans and does not substitute HTML for missing a
           );
       });
       assert.deepEqual(await page.evaluate(() => caches.keys()), [
-        "greenflow-shell-v22",
+        "greenflow-shell-v23",
       ]);
       await context.setOffline(true);
       await page.reload();
@@ -725,7 +725,7 @@ test("launching from a stale service worker loads current files and preserves sa
       assert.equal(await page.evaluate(() => window.legacyBuild), true);
       const before = await readState(page);
       await page.goto(origin + "/launch.html");
-      await page.waitForURL("**/index.html?v=22");
+      await page.waitForURL("**/index.html?v=23");
       await page.waitForFunction(
         () =>
           document.querySelector("#todayDate")?.textContent !== "—" &&
@@ -733,7 +733,7 @@ test("launching from a stale service worker loads current files and preserves sa
             .querySelector("#todayActive")
             ?.textContent.includes("Research"),
       );
-      assert.match(await page.locator(".sidebar-foot").textContent(), /v22/);
+      assert.match(await page.locator(".sidebar-foot").textContent(), /v23/);
       assert.equal(await page.evaluate(() => window.legacyBuild), undefined);
       const after = await readState(page);
       assert.equal(after.tasks[0].title, before.tasks[0].title);
@@ -744,12 +744,12 @@ test("launching from a stale service worker loads current files and preserves sa
       });
       const cacheNames = await page.evaluate(() => window.caches.keys());
       assert.ok(cacheNames.includes("other-app-cache"));
-      assert.ok(cacheNames.includes("greenflow-shell-v22"));
+      assert.ok(cacheNames.includes("greenflow-shell-v23"));
       assert.ok(!cacheNames.includes("greenflow-shell-v21"));
     },
     fixture({
       logs: [{ id: "l1", taskId: "t1", date: day, minutes: 30 }],
-        plans: [{ id: "p1", title: "Saved plan", date: day, time: "" }],
+      plans: [{ id: "p1", title: "Saved plan", date: day, time: "" }],
     }),
     instant,
     { serviceWorkers: "allow", startPath: "/legacy-start.html" },
@@ -768,7 +768,7 @@ test("online reload fetches current app files instead of a stale cached asset", 
               { once: true },
             ),
           );
-        const cache = await caches.open("greenflow-shell-v22");
+        const cache = await caches.open("greenflow-shell-v23");
         await cache.put(
           new URL("./app.js", location.href).href,
           new Response("window.staleAsset=true;", {
@@ -793,4 +793,71 @@ test("online reload fetches current app files instead of a stale cached asset", 
     fixture(),
     instant,
     { serviceWorkers: "allow" },
+  ));
+
+for (const timezoneId of ["UTC", "America/New_York", "Pacific/Kiritimati"]) {
+  test(`Today uses Tehran's 16 Mehr Thursday in ${timezoneId}`, () =>
+    withPage(
+      async (page) => {
+        const label = await page.locator("#todayDate").textContent();
+        assert.match(label, /۱۶/);
+        assert.match(label, /مهر/);
+        assert.match(label, /پنجشنبه/);
+        assert.equal((await readState(page)).settings.dayKey, "2026-10-08");
+        await navigate(page, "planner");
+        assert.equal(
+          await page
+            .locator("#weekGrid .day.today [data-adddate]")
+            .getAttribute("data-adddate"),
+          "2026-10-08",
+        );
+      },
+      fixture(),
+      "2026-10-07T21:00:00Z",
+      { timezoneId },
+    ));
+}
+
+test("Tehran midnight refreshes Today while the browser is still on Wednesday", () =>
+  withPage(
+    async (page) => {
+      assert.match(await page.locator("#todayDate").textContent(), /۱۵/);
+      await page.clock.runFor(2000);
+      assert.match(await page.locator("#todayDate").textContent(), /۱۶/);
+      assert.match(await page.locator("#todayDate").textContent(), /پنجشنبه/);
+      assert.equal((await readState(page)).settings.dayKey, "2026-10-08");
+    },
+    fixture(),
+    "2026-10-07T20:29:59Z",
+    { timezoneId: "UTC" },
+  ));
+
+test("reminders use Tehran's date and time when the browser is behind", () =>
+  withPage(
+    async (page) => {
+      await page.clock.runFor(1500);
+      const reminders = (await readState(page)).reminders;
+      assert.equal(reminders.find((r) => r.id === "due").notified, true);
+      assert.equal(reminders.find((r) => r.id === "later").notified, false);
+    },
+    fixture({
+      reminders: [
+        {
+          id: "due",
+          title: "Due in Tehran",
+          date: "2026-10-08",
+          time: "00:15",
+          notified: false,
+        },
+        {
+          id: "later",
+          title: "Later in Tehran",
+          date: "2026-10-08",
+          time: "01:00",
+          notified: false,
+        },
+      ],
+    }),
+    "2026-10-07T21:00:00Z",
+    { timezoneId: "UTC" },
   ));
