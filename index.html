@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>GreenFlow — Personal Jira Planner</title>
+<meta name="theme-color" content="#dfecef" id="themeColor">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="GreenFlow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand"><div class="logo">G</div><div><strong>GreenFlow</strong><span>Personal workspace</span></div></div>
+  <button class="create" data-action="new-task">＋ Create</button>
+  <nav>
+    <button class="nav active" data-view="today"><i>⌂</i><span>Today</span></button>
+    <button class="nav" data-view="planner"><i>▦</i><span>Planner</span></button>
+    <button class="nav" data-view="backlog"><i>≡</i><span>Backlog</span><em id="navBacklog">0</em></button>
+    <button class="nav" data-view="active"><i>▶</i><span>Active</span><em id="navActive">0</em></button>
+    <button class="nav" data-view="logged"><i>◷</i><span>Logged</span></button>
+    <button class="nav" data-view="reminders"><i>♢</i><span>Reminders</span><em id="navReminders">0</em></button>
+    <button class="nav" data-view="archive"><i>▣</i><span>Archive</span><em id="navArchive">0</em></button>
+    <div class="nav-sep"></div>
+    <button class="nav" data-view="routines"><i>✓</i><span>Routines</span></button>
+    <div class="nav-sep"></div>
+    <button class="nav utility-nav" data-action="toggle-theme"><i>◐</i><span id="themeLabel">Dark mode</span></button>
+    <button class="nav utility-nav" data-action="export-backup"><i>⇩</i><span>Export backup</span></button>
+    <button class="nav utility-nav" data-action="import-backup"><i>⇧</i><span>Restore backup</span></button>
+    <input id="backupInput" type="file" accept="application/json,.json" hidden>
+  </nav>
+  <div class="sidebar-foot"><span class="save-dot"></span> <span id="saveStatus">Saved locally</span><div>GreenFlow Pro · v15</div></div>
+</aside>
+
+<main>
+  <section class="view active-view" id="today">
+    <header class="pagehead"><div><div class="eyebrow">PERSONAL DASHBOARD</div><h1>Today</h1><p id="todayDate">—</p></div><div class="head-actions"><button class="secondary" data-action="quick-plan">＋ Quick plan</button><button class="primary" data-action="new-task">＋ Create task</button></div></header>
+    <div class="today-hero" id="dailyFocusHero">
+      <div class="daily-focus-main"><span class="hero-label">DAILY FOCUS ISSUE</span><div id="dailyFocusContent"><strong>No focus issue selected</strong><small>Choose one active issue to make today's priority.</small></div></div>
+      <div class="daily-focus-actions"><button class="hero-btn" id="dailyFocusOpen" type="button" hidden>Open issue</button><button class="hero-btn accent" id="dailyFocusStart" type="button" hidden>Start focus</button><button class="hero-btn" id="dailyFocusChoose" type="button">Choose issue</button></div>
+    </div>
+    <article class="weekly-goal-card surface"><div class="weekly-goal-head"><div><span class="focus-kicker">DAILY TIME GOAL</span><h2>Today's work target</h2><p id="weeklyGoalText">Set your standard daily work target. All logs from today count toward it.</p></div><button class="secondary small" id="weeklyGoalEdit">Set goal</button></div><div class="goal-progress"><div class="goal-track"><i id="weeklyGoalBar"></i></div><strong id="weeklyGoalValue">—</strong></div></article>
+    <div class="dashboard-grid">
+      <article class="surface span2 focus-card">
+        <div class="focus-top"><div><span class="focus-kicker">FOCUS SESSION</span><h2>Focus timer</h2><p>Stay with one thing. Optionally attach the session to an active Jira issue.</p></div><div class="focus-presets"><button data-focus-preset="25">25</button><button data-focus-preset="45">45</button><button data-focus-preset="60">60</button><button data-focus-preset="90">90</button></div></div>
+        <div class="focus-body">
+          <div class="focus-clock"><svg viewBox="0 0 120 120" aria-hidden="true"><circle class="focus-track" cx="60" cy="60" r="52"/><circle id="focusArc" class="focus-arc" cx="60" cy="60" r="52"/></svg><div class="focus-time"><strong id="focusTimerText">25:00</strong><span id="focusTimerState">Ready</span></div></div>
+          <div class="focus-controls"><label>Duration<div class="duration-edit"><button type="button" data-focus-adjust="-5">−5</button><input id="focusMinutes" type="number" min="1" max="240" value="25" aria-label="Focus duration in minutes"><span>min</span><button type="button" data-focus-adjust="5">+5</button></div></label><label>Link to issue <span class="hint">optional</span><select id="focusTask"><option value="">No issue — focus only</option></select></label><label class="focus-log-toggle"><input id="focusAutoLog" type="checkbox" checked> Log completed session to the linked issue</label><div class="focus-actions"><button id="focusStart" class="primary" type="button">Start focus</button><button id="focusPause" class="secondary" type="button" disabled>Pause</button><button id="focusStop" class="secondary" type="button" disabled>Stop & log</button><button id="focusCancel" class="secondary" type="button" disabled>Cancel</button><button id="focusReset" class="secondary" type="button">Reset</button></div></div>
+        </div>
+      </article>
+      <article class="surface span2"><div class="surface-head"><div><h2>Active tasks</h2><p>Jira issues currently in your active window</p></div><button class="textbtn" data-view="active">Open board →</button></div><div id="todayActive" class="issue-list"></div></article>
+      <article class="surface"><div class="surface-head"><div><h2>Today's plan</h2><p>One-off events</p></div><button class="iconbtn" data-action="quick-plan">＋</button></div><div id="todayPlans"></div></article>
+      <article class="surface"><div class="surface-head"><div><h2>Routines</h2><p>Check off, no Kanban</p></div><button class="iconbtn" data-action="new-routine">＋</button></div><div id="todayRoutines"></div></article>
+    </div>
+  </section>
+
+  <section class="view" id="planner">
+    <header class="pagehead"><div><div class="eyebrow">PERSONAL CALENDAR</div><h1>Planner</h1><p>Fast one-off scheduling with Persian weekdays and Jalali dates.</p></div><button class="primary" data-action="quick-plan">＋ Quick plan</button></header>
+    <div class="planner-controls"><div class="seg"><button class="selected" data-plannermode="week">Week</button><button data-plannermode="month">Month</button><button data-plannermode="year">Year</button></div><div class="period planner-period"><button data-plannermove="-1">‹</button><strong id="weekLabel">—</strong><button data-plannermove="1">›</button><button class="secondary small planner-current" data-plannercurrent>Current</button></div></div>
+    <div id="weekGrid"></div>
+  </section>
+
+  <section class="view" id="backlog">
+    <header class="pagehead"><div><div class="eyebrow">PROJECT WORK</div><h1>Backlog</h1><p>Prioritize project and study issues before moving them into Active.</p></div><button class="primary" data-action="new-task">＋ Create task</button></header>
+    <div class="filterbar"><div class="search"><span>⌕</span><input id="backlogSearch" placeholder="Search backlog"></div><select id="priorityFilter"><option value="all">All priorities</option><option>Highest</option><option>High</option><option>Medium</option><option>Low</option></select></div>
+    <article class="surface no-pad"><div class="table-head issue-grid"><span>Type</span><span>Key / Summary</span><span>Priority</span><span>Estimate</span><span>Due</span><span></span></div><div id="backlogList"></div></article>
+  </section>
+
+  <section class="view" id="active">
+    <header class="pagehead"><div><div class="eyebrow">CURRENT SPRINT</div><h1>Active Window</h1><p>Drag issues through your workflow. Click any issue to open details.</p></div><button class="primary" data-action="new-task-active">＋ Create issue</button></header>
+    <div class="board" id="board">
+      <section class="column" data-status="todo"><div class="colhead"><span>TO DO</span><b id="count-todo">0</b></div><div class="dropzone" id="col-todo"></div></section>
+      <section class="column" data-status="doing"><div class="colhead"><span>IN PROGRESS</span><b id="count-doing">0</b></div><div class="dropzone" id="col-doing"></div></section>
+      <section class="column" data-status="done"><div class="colhead"><span>DONE</span><b id="count-done">0</b></div><div class="dropzone" id="col-done"></div></section>
+    </div>
+  </section>
+
+  <section class="view" id="logged">
+    <header class="pagehead"><div><div class="eyebrow">TIME TRACKING</div><h1>Logged Window</h1><p>Jira-style timesheet for actual work. Click a cell to log against an issue.</p></div><button class="primary" data-action="new-log">＋ Log work</button></header>
+    <div class="log-controls"><div class="seg"><button class="selected" data-logmode="week">Week</button><button data-logmode="month">Month</button><button data-logmode="year">Year</button></div><div class="period"><button data-logmove="-1">‹</button><strong id="logLabel">—</strong><button data-logmove="1">›</button><button class="secondary small" data-logtoday>Today</button></div></div>
+    <article class="surface no-pad timesheet-wrap"><div id="timesheet"></div></article>
+    <article class="surface recent"><div class="surface-head"><div><h2>Worklog activity</h2><p>Recent entries in this period</p></div></div><div id="logActivity"></div></article>
+    <div class="metrics"><div class="metric"><span>Total logged</span><strong id="totalLogged">0h</strong><small>Selected period</small></div><div class="metric"><span>Worklogs</span><strong id="entryCount">0</strong><small>Individual entries</small></div><div class="metric"><span>Issues worked</span><strong id="issueCount">0</strong><small>Unique tasks</small></div><div class="metric"><span>Daily average</span><strong id="dailyAvg">0h</strong><small>Across active days</small></div></div>
+  </section>
+
+  <section class="view" id="reminders">
+    <header class="pagehead"><div><div class="eyebrow">PERSONAL REMINDERS</div><h1>Reminders</h1><p>Simple reminders stay separate from plans and Jira issues.</p></div><button class="primary" data-action="new-reminder">＋ New reminder</button></header>
+    <article class="surface no-pad"><div id="reminderList"></div></article>
+  </section>
+
+  <section class="view" id="routines">
+    <header class="pagehead"><div><div class="eyebrow">HABITS</div><h1>Routines</h1><p>Recurring checklists stay separate from project issues and repeat every week until you stop them.</p></div><button class="primary" data-action="new-routine">＋ New routine</button></header>
+    <div class="routine-grid" id="routineCards"></div>
+  </section>
+
+  <section class="view" id="archive">
+    <header class="pagehead"><div><div class="eyebrow">HISTORY</div><h1>Archive</h1><p>Completed or parked issues stay here permanently with their descriptions, subtasks and complete work-log history.</p></div></header>
+    <div class="filterbar"><div class="search"><span>⌕</span><input id="archiveSearch" placeholder="Search archived issues"></div><select id="archiveStatusFilter"><option value="all">All previous statuses</option><option value="done">Done</option><option value="doing">In Progress</option><option value="todo">To Do</option><option value="backlog">Backlog</option></select></div>
+    <article class="surface no-pad"><div class="table-head archive-grid"><span>Key / Summary</span><span>Archived from</span><span>Logged</span><span>Archived on</span><span></span></div><div id="archiveList"></div></article>
+  </section>
+
+</main>
+
+<button class="mobile-fab" data-action="quick-plan">＋</button>
+<div id="overlayRoot"></div>
+<div id="toastRoot"></div>
+<script src="app.js"></script>
+</body>
+</html>
