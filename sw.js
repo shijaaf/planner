@@ -1,5 +1,70 @@
-const CACHE="greenflow-shell-v20";
-const ASSETS=["./","./index.html","./styles.css","./app.js","./manifest.webmanifest","./icon.svg"];
-self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
-self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith("greenflow-shell-")&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
-self.addEventListener("fetch",e=>{if(e.request.method!=="GET")return;e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match("./index.html"))))});
+const CACHE = "greenflow-shell-v21";
+const ASSETS = [
+  "./",
+  "./index.html",
+  "./styles.css",
+  "./app.js",
+  "./manifest.webmanifest",
+  "./icon.svg",
+];
+const assetURLs = new Set(
+  ASSETS.map((path) => new URL(path, self.location).href),
+);
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) =>
+        cache.addAll(
+          ASSETS.map((path) => new Request(path, { cache: "reload" })),
+        ),
+      )
+      .then(() => self.skipWaiting()),
+  );
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter(
+              (key) => key.startsWith("greenflow-shell-") && key !== CACHE,
+            )
+            .map((key) => caches.delete(key)),
+        ),
+      )
+      .then(() => self.clients.claim()),
+  );
+});
+self.addEventListener("fetch", (event) => {
+  const request = event.request;
+  const url = new URL(request.url);
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  url.search = "";
+  if (request.mode !== "navigate" && !assetURLs.has(url.href)) return;
+  event.respondWith(
+    (async () => {
+      const cache = await caches.open(CACHE);
+      const cached = await cache.match(url.href);
+      if (request.mode !== "navigate" && cached) return cached;
+      try {
+        const response = await fetch(request);
+        if (response.ok && assetURLs.has(url.href))
+          event.waitUntil(cache.put(url.href, response.clone()));
+        return response;
+      } catch (error) {
+        if (cached) return cached;
+        if (request.mode === "navigate") {
+          const shell = await cache.match(
+            new URL("./index.html", self.location).href,
+          );
+          if (shell) return shell;
+        }
+        throw error;
+      }
+    })(),
+  );
+});

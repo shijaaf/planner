@@ -153,5 +153,8 @@ main{background:transparent}.surface,.column,.day{box-shadow:0 8px 24px rgba(50,
 @media(max-width:520px){.picker-modal-layer{padding:10px}.picker-dialog{width:min(360px,calc(100vw - 20px));padding:16px;border-radius:20px}.picker-actions{margin:16px -16px -16px;padding:12px 16px}.picker-dialog .cal-week,.picker-dialog .cal-grid{gap:3px}.time-picker-dialog .wheel-col{height:200px;padding:66px 0}.time-picker-dialog .wheel-item{height:66px}}
 
 /* v20 plan affordance + lightweight interaction polish */
-.editable-plan,.mini-plan[data-edit-plan-v20],.cal-item[data-edit-plan-v20]{cursor:pointer}
-.editable-plan:hover,.mini-plan[data-edit-plan-v20]:hover,.cal-item[data-edit-plan-v20]:hover{filter:brightness(.985);box-shadow:0 3px 12px rgba(42,88,105,.08)}
+.editable-plan{cursor:pointer}
+.editable-plan:hover{filter:brightness(.985);box-shadow:0 3px 12px rgba(42,88,105,.08)}
+.editable-plan:focus-visible{outline:2px solid #4f86d9;outline-offset:3px}
+.plan-row .grow{min-width:0}.plan-row .grow b{overflow-wrap:anywhere}
+.plan-row [data-plan-log]{flex-shrink:0}

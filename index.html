@@ -33,7 +33,7 @@
     <button class="nav utility-nav" data-action="import-backup"><i>⇧</i><span>Restore backup</span></button>
     <input id="backupInput" type="file" accept="application/json,.json" hidden>
   </nav>
-  <div class="sidebar-foot"><span class="save-dot"></span> <span id="saveStatus">Saved locally</span><div>GreenFlow Pro · v15</div></div>
+  <div class="sidebar-foot"><span class="save-dot"></span> <span id="saveStatus">Saved locally</span><div>GreenFlow Pro · v21</div></div>
 </aside>
 
 <main>
@@ -80,11 +80,11 @@
   </section>
 
   <section class="view" id="logged">
-    <header class="pagehead"><div><div class="eyebrow">TIME TRACKING</div><h1>Logged Window</h1><p>Jira-style timesheet for actual work. Click a cell to log against an issue.</p></div><button class="primary" data-action="new-log">＋ Log work</button></header>
+    <header class="pagehead"><div><div class="eyebrow">TIME TRACKING</div><h1>Logged Window</h1><p>Actual time from tasks, plans, and routines. Click a task cell to log work.</p></div><button class="primary" data-action="new-log">＋ Log work</button></header>
     <div class="log-controls"><div class="seg"><button class="selected" data-logmode="week">Week</button><button data-logmode="month">Month</button><button data-logmode="year">Year</button></div><div class="period"><button data-logmove="-1">‹</button><strong id="logLabel">—</strong><button data-logmove="1">›</button><button class="secondary small" data-logtoday>Today</button></div></div>
     <article class="surface no-pad timesheet-wrap"><div id="timesheet"></div></article>
     <article class="surface recent"><div class="surface-head"><div><h2>Worklog activity</h2><p>Recent entries in this period</p></div></div><div id="logActivity"></div></article>
-    <div class="metrics"><div class="metric"><span>Total logged</span><strong id="totalLogged">0h</strong><small>Selected period</small></div><div class="metric"><span>Worklogs</span><strong id="entryCount">0</strong><small>Individual entries</small></div><div class="metric"><span>Issues worked</span><strong id="issueCount">0</strong><small>Unique tasks</small></div><div class="metric"><span>Daily average</span><strong id="dailyAvg">0h</strong><small>Across active days</small></div></div>
+    <div class="metrics"><div class="metric"><span>Total logged</span><strong id="totalLogged">0h</strong><small>Selected period</small></div><div class="metric"><span>Worklogs</span><strong id="entryCount">0</strong><small>Individual entries</small></div><div class="metric"><span>Activities</span><strong id="issueCount">0</strong><small>Tasks, plans, and routines</small></div><div class="metric"><span>Daily average</span><strong id="dailyAvg">0h</strong><small>Across active days</small></div></div>
   </section>
 
   <section class="view" id="reminders">
