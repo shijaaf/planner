@@ -1,5 +1,7 @@
-(() => {
+(async () => {
   "use strict";
+  const calendarClock = window.GreenFlowClock;
+  await calendarClock.sync();
   const $ = (s, r = document) => r.querySelector(s),
     $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const STORAGE = "greenflow_pro_v5";
@@ -52,7 +54,7 @@
     second: "2-digit",
     hourCycle: "h23",
   });
-  const clockParts = (date = new Date()) =>
+  const clockParts = (date = calendarClock.now()) =>
     Object.fromEntries(
       tehranClock.formatToParts(date).map(({ type, value }) => [type, value]),
     );
@@ -1132,13 +1134,38 @@
     return true;
   }
 
-  // Re-check when the user returns to the tab/window and while the app stays open.
+  function renderClockStatus() {
+    const label = $("#clockStatus");
+    if (!label) return;
+    label.textContent =
+      calendarClock.status === "verified"
+        ? "Tehran time · Internet verified"
+        : calendarClock.status === "estimated"
+          ? "Tehran time · Using last synced time"
+          : "Tehran time · Using computer clock";
+    label.title =
+      calendarClock.status === "device"
+        ? "Internet time is unavailable. Enable automatic date and time in your computer settings if the date is wrong."
+        : "Today follows Tehran midnight. Internet time is checked automatically.";
+  }
+  async function refreshCalendarClock() {
+    handleDayRollover();
+    await calendarClock.sync();
+    handleDayRollover();
+    scheduleMidnight();
+    renderClockStatus();
+    checkReminders();
+  }
+  // Resync after sleep, clock changes, and reconnecting; no fixed date or +1-day patch.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") handleDayRollover();
+    if (document.visibilityState === "visible") refreshCalendarClock();
   });
-  window.addEventListener("focus", () => handleDayRollover());
-  window.addEventListener("pageshow", () => handleDayRollover());
-  setInterval(() => handleDayRollover(), 30000);
+  window.addEventListener("focus", refreshCalendarClock);
+  window.addEventListener("pageshow", refreshCalendarClock);
+  window.addEventListener("online", refreshCalendarClock);
+  setInterval(refreshCalendarClock, 30000);
+  // The launcher may still be fetching its first time sample during startup.
+  for (const delay of [2000, 8000]) setTimeout(refreshCalendarClock, delay);
 
   /* ===== GreenFlow v10: focus controls, goals, richer planner/logs ===== */
   function parseDurationHM(v) {
@@ -2341,7 +2368,7 @@
   let midnightTimer;
   function scheduleMidnight() {
     clearTimeout(midnightTimer);
-    const now = new Date();
+    const now = calendarClock.now();
     const p = clockParts(now);
     const elapsed =
       (Number(p.hour) * 3600 + Number(p.minute) * 60 + Number(p.second)) *
@@ -2667,6 +2694,7 @@
 
   applyTheme();
   handleDayRollover(true);
+  renderClockStatus();
   openView("today");
   const initialFocus = focusData();
   if (initialFocus.running) {
@@ -2684,7 +2712,7 @@ if (
 ) {
   window.addEventListener("load", () =>
     navigator.serviceWorker
-      .register("./sw.js?v=23", { updateViaCache: "none" })
+      .register("./sw.js?v=24", { updateViaCache: "none" })
       .then((registration) => registration.update())
       .catch(() => {}),
   );

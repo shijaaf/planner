@@ -1,11 +1,11 @@
 {
   "name": "greenflow-planner",
-  "version": "23.0.0",
+  "version": "24.0.0",
   "private": true,
   "scripts": {
     "start": "python3 serve-greenflow.py",
     "test": "python3 -m unittest discover -s tests -p 'test_*.py' && node --test tests/planner.test.cjs",
-    "check": "node --check app.js && node --check sw.js"
+    "check": "node --check app.js && node --check clock.js && node --check sw.js"
   },
   "devDependencies": {
     "playwright": "1.62.1"

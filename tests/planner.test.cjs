@@ -144,12 +144,29 @@ async function withPage(run, data = fixture(), time = instant, options = {}) {
     { storageKey, data },
   );
   const page = await context.newPage();
+  if (options.timeResponse) {
+    await page.route("**/api/time", async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(
+          typeof options.timeResponse === "function"
+            ? options.timeResponse()
+            : options.timeResponse,
+        ),
+      }),
+    );
+  }
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.clock.install({ time: new Date(time) });
   await page.clock.pauseAt(new Date(time));
   try {
     await page.goto(origin + (options.startPath || ""));
+    if (!options.startPath)
+      await page.waitForFunction(
+        () => document.querySelector("#todayDate").textContent !== "—",
+      );
     await run(page, context);
     assert.deepEqual(errors, [], "No uncaught JavaScript errors");
   } finally {
@@ -526,7 +543,7 @@ test("offline shell keeps saved plans and does not substitute HTML for missing a
           );
       });
       assert.deepEqual(await page.evaluate(() => caches.keys()), [
-        "greenflow-shell-v23",
+        "greenflow-shell-v24",
       ]);
       await context.setOffline(true);
       await page.reload();
@@ -725,7 +742,7 @@ test("launching from a stale service worker loads current files and preserves sa
       assert.equal(await page.evaluate(() => window.legacyBuild), true);
       const before = await readState(page);
       await page.goto(origin + "/launch.html");
-      await page.waitForURL("**/index.html?v=23");
+      await page.waitForURL("**/index.html?v=24");
       await page.waitForFunction(
         () =>
           document.querySelector("#todayDate")?.textContent !== "—" &&
@@ -733,7 +750,7 @@ test("launching from a stale service worker loads current files and preserves sa
             .querySelector("#todayActive")
             ?.textContent.includes("Research"),
       );
-      assert.match(await page.locator(".sidebar-foot").textContent(), /v23/);
+      assert.match(await page.locator(".sidebar-foot").textContent(), /v24/);
       assert.equal(await page.evaluate(() => window.legacyBuild), undefined);
       const after = await readState(page);
       assert.equal(after.tasks[0].title, before.tasks[0].title);
@@ -744,7 +761,7 @@ test("launching from a stale service worker loads current files and preserves sa
       });
       const cacheNames = await page.evaluate(() => window.caches.keys());
       assert.ok(cacheNames.includes("other-app-cache"));
-      assert.ok(cacheNames.includes("greenflow-shell-v23"));
+      assert.ok(cacheNames.includes("greenflow-shell-v24"));
       assert.ok(!cacheNames.includes("greenflow-shell-v21"));
     },
     fixture({
@@ -768,7 +785,7 @@ test("online reload fetches current app files instead of a stale cached asset", 
               { once: true },
             ),
           );
-        const cache = await caches.open("greenflow-shell-v23");
+        const cache = await caches.open("greenflow-shell-v24");
         await cache.put(
           new URL("./app.js", location.href).href,
           new Response("window.staleAsset=true;", {
@@ -860,4 +877,125 @@ test("reminders use Tehran's date and time when the browser is behind", () =>
     }),
     "2026-10-07T21:00:00Z",
     { timezoneId: "UTC" },
+  ));
+
+test("online time corrects a computer clock one day behind without a fixed date", () =>
+  withPage(
+    async (page) => {
+      assert.match(await page.locator("#todayDate").textContent(), /۱۶/);
+      assert.match(await page.locator("#todayDate").textContent(), /پنجشنبه/);
+      assert.match(
+        await page.locator("#clockStatus").textContent(),
+        /Internet verified/,
+      );
+      assert.equal((await readState(page)).settings.dayKey, "2026-10-08");
+      // Changing the OS clock while the page is open cannot undo verified time.
+      await page.clock.setSystemTime(new Date("2025-01-01T00:00:00Z"));
+      assert.equal(
+        await page.evaluate(() =>
+          window.GreenFlowClock.now().toISOString().slice(0, 10),
+        ),
+        "2026-10-08",
+      );
+      await page.evaluate(() => window.dispatchEvent(new Event("pageshow")));
+      await page.waitForFunction(() =>
+        document
+          .querySelector("#clockStatus")
+          .textContent.includes("Internet verified"),
+      );
+      assert.match(await page.locator("#todayDate").textContent(), /۱۶/);
+      assert.equal((await readState(page)).settings.dayKey, "2026-10-08");
+    },
+    fixture(),
+    "2026-10-07T12:00:00Z",
+    {
+      timeResponse: {
+        utcMs: Date.parse("2026-10-08T12:00:00Z"),
+        syncedAgoSeconds: 0,
+      },
+    },
+  ));
+
+test("verified Tehran time rolls into the next day offline without hardcoding", () =>
+  withPage(
+    async (page) => {
+      await page.unroute("**/api/time");
+      await page.route("**/api/time", (route) => route.abort());
+      await page.clock.runFor(2000);
+      assert.match(await page.locator("#todayDate").textContent(), /۱۷/);
+      assert.match(await page.locator("#todayDate").textContent(), /جمعه/);
+      assert.equal((await readState(page)).settings.dayKey, "2026-10-09");
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await page.waitForFunction(() =>
+        document
+          .querySelector("#clockStatus")
+          .textContent.includes("last synced"),
+      );
+      assert.equal((await readState(page)).settings.dayKey, "2026-10-09");
+      await page.reload();
+      await page.waitForFunction(() =>
+        document.querySelector("#todayDate").textContent.includes("۱۷"),
+      );
+      assert.match(
+        await page.locator("#clockStatus").textContent(),
+        /last synced/,
+      );
+    },
+    fixture(),
+    "2026-10-07T20:29:59Z",
+    {
+      timeResponse: {
+        utcMs: Date.parse("2026-10-08T20:29:59Z"),
+        syncedAgoSeconds: 0,
+      },
+    },
+  ));
+
+test("reconnecting after sleep resyncs date, reminders, and new plan defaults", () => {
+  let utcMs = Date.parse("2026-10-08T12:00:00Z");
+  return withPage(
+    async (page) => {
+      utcMs = Date.parse("2026-10-09T12:00:00Z");
+      await page.evaluate(() => window.dispatchEvent(new Event("online")));
+      await page.waitForFunction(() =>
+        document.querySelector("#todayDate").textContent.includes("۱۷"),
+      );
+      assert.equal((await readState(page)).settings.dayKey, "2026-10-09");
+      assert.equal((await readState(page)).reminders[0].notified, true);
+      await page.locator('[data-action="quick-plan"]').first().click();
+      assert.equal(
+        await page.locator('#planForm [name="date"]').inputValue(),
+        "2026-10-09",
+      );
+    },
+    fixture({
+      reminders: [
+        {
+          id: "due",
+          title: "Wake reminder",
+          date: "2026-10-09",
+          time: "15:00",
+          notified: false,
+        },
+      ],
+    }),
+    instant,
+    {
+      timeResponse: () => ({ utcMs, syncedAgoSeconds: 0 }),
+    },
+  );
+});
+
+test("unavailable or invalid internet time uses an explicit device-clock fallback", () =>
+  withPage(
+    async (page) => {
+      assert.match(
+        await page.locator("#clockStatus").textContent(),
+        /Using computer clock/,
+      );
+      assert.equal((await readState(page)).settings.dayKey, day);
+    },
+    fixture(),
+    instant,
+    { timeResponse: { utcMs: "not a timestamp", syncedAgoSeconds: 0 } },
   ));
