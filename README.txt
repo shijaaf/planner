@@ -1,20 +1,10 @@
-GREENFLOW LOCAL + MOBILE
+GREENFLOW LOCAL
 
-Laptop:
 1) Double-click start-greenflow.bat
 2) Browser opens http://localhost:8765
 3) Keep the black command window open while using the app.
 4) Because the origin stays localhost:8765, localStorage persists between sessions in the same browser profile.
 
-Phone on the SAME Wi-Fi:
-1) Start GreenFlow on the laptop.
-2) Run phone-address.bat to display the laptop IPv4 address.
-3) On the phone open http://LAPTOP-IP:8765 (example: http://192.168.1.20:8765).
-4) Windows Firewall may ask for permission. Allow Python on Private networks only.
-
-Important data note:
-Laptop and phone browsers have separate localStorage. They do NOT automatically sync yet.
-Use Export backup / Restore backup to move data between them.
 
 PWA:
 On the laptop, localhost is a secure-context exception and installation/offline shell can work.
