@@ -1,10 +1,10 @@
 {
   "name": "greenflow-planner",
-  "version": "21.0.0",
+  "version": "22.0.0",
   "private": true,
   "scripts": {
-    "start": "python3 -m http.server 8765 --bind 127.0.0.1",
-    "test": "node --test tests/planner.test.cjs",
+    "start": "python3 serve-greenflow.py",
+    "test": "python3 -m unittest discover -s tests -p 'test_*.py' && node --test tests/planner.test.cjs",
     "check": "node --check app.js && node --check sw.js"
   },
   "devDependencies": {

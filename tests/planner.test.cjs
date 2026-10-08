@@ -60,7 +60,41 @@ before(async () => {
     ".webmanifest": "application/manifest+json",
   };
   server = http.createServer(async (req, res) => {
-    const pathname = new URL(req.url, "http://localhost").pathname;
+    const url = new URL(req.url, "http://localhost");
+    const pathname = url.pathname;
+    if (pathname === "/legacy-start.html") {
+      res
+        .writeHead(200, { "Content-Type": "text/html" })
+        .end("<!doctype html><title>Legacy worker setup</title>");
+      return;
+    }
+    if (pathname === "/sw.js" && url.searchParams.get("v") === "legacy") {
+      const legacy = `
+        const CACHE='greenflow-shell-v21';
+        const assets=['./index.html','./app.js','./styles.css'];
+        self.addEventListener('install',event=>event.waitUntil((async()=>{
+          const cache=await caches.open(CACHE);
+          await cache.put(new URL('./index.html',self.location).href,new Response('<!doctype html><title>Old GreenFlow</title><body>Old GreenFlow<script src="./app.js"><\\/script>',{headers:{'Content-Type':'text/html'}}));
+          await cache.put(new URL('./app.js',self.location).href,new Response('window.legacyBuild=true;',{headers:{'Content-Type':'text/javascript'}}));
+          await self.skipWaiting();
+        })()));
+        self.addEventListener('activate',event=>event.waitUntil(self.clients.claim()));
+        self.addEventListener('fetch',event=>{
+          const url=new URL(event.request.url);url.search='';
+          event.respondWith((async()=>{
+            const cached=await (await caches.open(CACHE)).match(url.href);
+            return cached||fetch(event.request);
+          })());
+        });
+      `;
+      res
+        .writeHead(200, {
+          "Content-Type": "text/javascript",
+          "Cache-Control": "no-store",
+        })
+        .end(legacy);
+      return;
+    }
     const target = path.resolve(
       root,
       "." + (pathname === "/" ? "/index.html" : pathname),
@@ -115,7 +149,7 @@ async function withPage(run, data = fixture(), time = instant, options = {}) {
   await page.clock.install({ time: new Date(time) });
   await page.clock.pauseAt(new Date(time));
   try {
-    await page.goto(origin);
+    await page.goto(origin + (options.startPath || ""));
     await run(page, context);
     assert.deepEqual(errors, [], "No uncaught JavaScript errors");
   } finally {
@@ -401,13 +435,11 @@ test("backup round trip keeps plan logs and invalid backups leave data intact", 
     const downloadPromise = page.waitForEvent("download");
     await page.locator('[data-action="export-backup"]').click();
     const backup = await fs.readFile(await (await downloadPromise).path());
-    await page
-      .locator("#backupInput")
-      .setInputFiles({
-        name: "backup.json",
-        mimeType: "application/json",
-        buffer: backup,
-      });
+    await page.locator("#backupInput").setInputFiles({
+      name: "backup.json",
+      mimeType: "application/json",
+      buffer: backup,
+    });
     await page.waitForFunction(() =>
       document
         .querySelector("#toastRoot")
@@ -415,13 +447,11 @@ test("backup round trip keeps plan logs and invalid backups leave data intact", 
     );
     assert.equal((await readState(page)).plans[0].title, "Walk");
     assert.equal((await readState(page)).logs[0].minutes, 20);
-    await page
-      .locator("#backupInput")
-      .setInputFiles({
-        name: "bad.json",
-        mimeType: "application/json",
-        buffer: Buffer.from('{"tasks":[null]}'),
-      });
+    await page.locator("#backupInput").setInputFiles({
+      name: "bad.json",
+      mimeType: "application/json",
+      buffer: Buffer.from('{"tasks":[null]}'),
+    });
     await page.waitForFunction(() =>
       document.querySelector("#toastRoot").textContent.includes("Invalid"),
     );
@@ -496,7 +526,7 @@ test("offline shell keeps saved plans and does not substitute HTML for missing a
           );
       });
       assert.deepEqual(await page.evaluate(() => caches.keys()), [
-        "greenflow-shell-v21",
+        "greenflow-shell-v22",
       ]);
       await context.setOffline(true);
       await page.reload();
@@ -672,3 +702,95 @@ test("invalid stored backup structure is preserved without crashing the app", ()
       '{"tasks":[null]}',
     );
   }, '{"tasks":[null]}'));
+
+test("launching from a stale service worker loads current files and preserves saved data", () =>
+  withPage(
+    async (page) => {
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.register("./sw.js?v=legacy");
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller)
+          await new Promise((resolve) =>
+            navigator.serviceWorker.addEventListener(
+              "controllerchange",
+              resolve,
+              { once: true },
+            ),
+          );
+        const other = await caches.open("other-app-cache");
+        await other.put("./other", new Response("Keep unrelated cached data"));
+      });
+      await page.goto(origin + "/index.html");
+      assert.equal(await page.title(), "Old GreenFlow");
+      assert.equal(await page.evaluate(() => window.legacyBuild), true);
+      const before = await readState(page);
+      await page.goto(origin + "/launch.html");
+      await page.waitForURL("**/index.html?v=22");
+      await page.waitForFunction(
+        () =>
+          document.querySelector("#todayDate")?.textContent !== "—" &&
+          document
+            .querySelector("#todayActive")
+            ?.textContent.includes("Research"),
+      );
+      assert.match(await page.locator(".sidebar-foot").textContent(), /v22/);
+      assert.equal(await page.evaluate(() => window.legacyBuild), undefined);
+      const after = await readState(page);
+      assert.equal(after.tasks[0].title, before.tasks[0].title);
+      assert.deepEqual(after.logs, before.logs);
+      assert.deepEqual(after.plans, before.plans);
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+      });
+      const cacheNames = await page.evaluate(() => window.caches.keys());
+      assert.ok(cacheNames.includes("other-app-cache"));
+      assert.ok(cacheNames.includes("greenflow-shell-v22"));
+      assert.ok(!cacheNames.includes("greenflow-shell-v21"));
+    },
+    fixture({
+      logs: [{ id: "l1", taskId: "t1", date: day, minutes: 30 }],
+        plans: [{ id: "p1", title: "Saved plan", date: day, time: "" }],
+    }),
+    instant,
+    { serviceWorkers: "allow", startPath: "/legacy-start.html" },
+  ));
+
+test("online reload fetches current app files instead of a stale cached asset", () =>
+  withPage(
+    async (page, context) => {
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller)
+          await new Promise((resolve) =>
+            navigator.serviceWorker.addEventListener(
+              "controllerchange",
+              resolve,
+              { once: true },
+            ),
+          );
+        const cache = await caches.open("greenflow-shell-v22");
+        await cache.put(
+          new URL("./app.js", location.href).href,
+          new Response("window.staleAsset=true;", {
+            headers: { "Content-Type": "text/javascript" },
+          }),
+        );
+      });
+      await page.reload();
+      assert.equal(await page.evaluate(() => window.staleAsset), undefined);
+      assert.match(
+        await page.locator("#todayActive").textContent(),
+        /Research/,
+      );
+      await context.setOffline(true);
+      await page.reload();
+      assert.equal(await page.evaluate(() => window.staleAsset), undefined);
+      assert.match(
+        await page.locator("#todayActive").textContent(),
+        /Research/,
+      );
+    },
+    fixture(),
+    instant,
+    { serviceWorkers: "allow" },
+  ));

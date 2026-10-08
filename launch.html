@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dfecef">
+  <title>Opening GreenFlow</title>
+  <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6faf7; color: #26343c; font: 16px system-ui, sans-serif; }
+    main { max-width: 30rem; padding: 2rem; }
+    h1 { font-size: 1.5rem; } p { line-height: 1.6; }
+    button { padding: .7rem 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Opening GreenFlow…</h1>
+    <p id="status">Refreshing the app. Your saved tasks and logs stay intact.</p>
+    <button id="retry" hidden>Try again</button>
+    <noscript>Please enable JavaScript to open the planner.</noscript>
+  </main>
+  <script>
+    (async () => {
+      try {
+        const scope = new URL('./', location.href).href;
+        const workerPath = new URL('./sw.js', location.href).pathname;
+        if ('serviceWorker' in navigator) {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(registrations.filter(registration => {
+            if (registration.scope !== scope) return false;
+            return [registration.active, registration.waiting, registration.installing]
+              .some(worker => worker && new URL(worker.scriptURL).pathname === workerPath);
+          }).map(registration => registration.unregister()));
+        }
+        if ('caches' in window) {
+          const names = await caches.keys();
+          await Promise.all(names.filter(name => name.startsWith('greenflow-shell-'))
+            .map(name => caches.delete(name)));
+        }
+        location.replace(new URL('./index.html?v=22', location.href).href);
+      } catch (error) {
+        console.error('GreenFlow launch refresh failed', error);
+        document.querySelector('#status').textContent = 'Could not refresh the app. Close other GreenFlow tabs and try again.';
+        const retry = document.querySelector('#retry');
+        retry.hidden = false;
+        retry.onclick = () => location.reload();
+      }
+    })();
+  </script>
+</body>
+</html>

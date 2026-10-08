@@ -1,4 +1,4 @@
-const CACHE = "greenflow-shell-v21";
+const CACHE = "greenflow-shell-v22";
 const ASSETS = [
   "./",
   "./index.html",
@@ -49,9 +49,8 @@ self.addEventListener("fetch", (event) => {
     (async () => {
       const cache = await caches.open(CACHE);
       const cached = await cache.match(url.href);
-      if (request.mode !== "navigate" && cached) return cached;
       try {
-        const response = await fetch(request);
+        const response = await fetch(request, { cache: "no-store" });
         if (response.ok && assetURLs.has(url.href))
           event.waitUntil(cache.put(url.href, response.clone()));
         return response;

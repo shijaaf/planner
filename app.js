@@ -2655,7 +2655,7 @@ if (
 ) {
   window.addEventListener("load", () =>
     navigator.serviceWorker
-      .register("./sw.js", { updateViaCache: "none" })
+      .register("./sw.js?v=22", { updateViaCache: "none" })
       .then((registration) => registration.update())
       .catch(() => {}),
   );
